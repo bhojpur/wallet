@@ -22,9 +22,15 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/bhojpur/wallet/pkg/config"
+	"github.com/bhojpur/wallet/pkg/registry"
+	"github.com/bhojpur/wallet/pkg/routing"
+	"github.com/bhojpur/wallet/pkg/storage/postgres"
+
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -36,8 +42,8 @@ var rootCmd = &cobra.Command{
 	Short: "Bhojpur Wallet is a digital wallet processing engine powered by Kubernetes",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if verbose {
-			log.SetLevel(log.DebugLevel)
-			log.Debug("verbose logging enabled")
+			logger.SetLevel(logger.DebugLevel)
+			logger.Debug("verbose logging enabled")
 		}
 	},
 
@@ -53,6 +59,31 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	// read yaml config file. Dont pass path to read
+	// from default path
+	yamlConfig := config.ReadYaml("")
+	config := config.GetConfig(*yamlConfig)
+
+	database, err := postgres.NewDatabase(config)
+	if err != nil {
+		log.Printf("database err %s", err)
+		os.Exit(1)
+	}
+
+	// run migrations; update tables
+	postgres.Migrate(database)
+
+	channels := registry.NewChannels()
+	domain := registry.NewDomain(config, database, channels)
+
+	// create the fiber server.
+	server := routing.Router(domain, config) // add endpoints
+
+	// listen and serve
+	port := fmt.Sprintf(":%v", 6700)
+	log.Fatal(server.Listen(port))
 }
 
 func init() {

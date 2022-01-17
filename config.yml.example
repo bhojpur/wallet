@@ -1,0 +1,8 @@
+database:
+  host: "127.0.0.1"
+  port: "5432"
+  user: "bhojpur"
+  password: "bhojpur"
+  dbname: "bhojpur"
+
+app_secret_key: "eQig7GS4cHO2su"
